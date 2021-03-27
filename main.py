@@ -1,9 +1,11 @@
 import sys
 import time
-from dataclasses import dataclass
-from math import sqrt, pow
-from typing import Tuple, Optional, List
+from numba import float64
+import numpy as np
+from typing import Tuple, List
 
+import numba
+from numba.experimental import jitclass
 import pygame
 
 # Intialize the pygame
@@ -12,8 +14,8 @@ pygame.init()
 WIDTH = 600
 HEIGHT = 600
 
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
+BLACK = (0.0, 0.0, 0.0)
+WHITE = (255.0, 255.0, 255.0)
 BACKGROUND_COLOR = WHITE
 
 VIEW_PORT_SIZE = 1
@@ -21,7 +23,7 @@ PROJECTION_PLAN_Z = 1.0
 CAMERA_ROTATION = [[0.7071, 0, -0.7071],
                    [0, 1, 0],
                    [0.7071, 0, 0.7071]]
-CAMERA_POSITION = (0, 0, 0)
+CAMERA_POSITION = np.array((0.0, 0.0, 0.0))
 
 MIN_POINT = 1
 MAX_POINT = sys.maxsize
@@ -32,27 +34,39 @@ LIGHT_POINT = 1
 LIGHT_DIRECTIONAL = 2
 
 
-@dataclass(frozen=True)
+@jitclass
 class Sphere:
-    center: Tuple[int, int, int]
+    center: float64[:]
     radius: int
-    color: Tuple[int, int, int]
+    color: float64[:]
     specular: int
     reflective: float
 
+    def __init__(self, center, radius, color, specular, reflective):
+        self.center = center
+        self.radius = radius
+        self.color = color
+        self.specular = specular
+        self.reflective = reflective
 
-@dataclass(frozen=True)
+
+@jitclass
 class Light:
     type: int
     intensity: float
-    position: Optional[Tuple[int, int, int]]
+    position: float64[:]
+
+    def __init__(self, type, intensity, position):
+        self.type = type
+        self.intensity = intensity
+        self.position = position
 
 
 # create the screen
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
 
-# @numba.njit()
+@numba.njit
 def canvas_to_viewport(x: int, y: int) -> Tuple[float, float, float]:
     """
     Переводим координаты из заданных в конфиге к размерам нашего холста.
@@ -66,13 +80,12 @@ def canvas_to_viewport(x: int, y: int) -> Tuple[float, float, float]:
     return new_x, new_y, PROJECTION_PLAN_Z
 
 
-# @numba.njit()
-def multiply_sw(infant: float, v: Tuple[float, float, float]) -> Tuple[
-    float, float, float]:
-    return infant * v[0], infant * v[1], infant * v[2]
+@numba.njit
+def multiply_sw(infant: float, v: np.array) -> np.array:
+    return np.array((infant * v[0], infant * v[1], infant * v[2]))
 
 
-# @numba.njit()
+@numba.njit
 def multiply_mv(x: float, y: float, z: float) -> Tuple[float, float, float]:
     """
     Вычисляем поворот камеры для каждого пикселя
@@ -92,28 +105,28 @@ def multiply_mv(x: float, y: float, z: float) -> Tuple[float, float, float]:
     return new_x, new_y, new_z
 
 
-# @numba.njit()
+@numba.njit
 def add(
-        item: Tuple[float, float, float],
-        item2: Tuple[float, float, float]) -> Tuple[float, float, float]:
-    return item[0] + item2[0], item[1] + item2[1], item[2] + item2[2]
+        item: np.array,
+        item2: np.array) -> np.array:
+    return np.array((item[0] + item2[0], item[1] + item2[1], item[2] + item2[2]))
 
 
-# @numba.njit()
-def subtract(item: Tuple[float, float, float],
-             item2: Tuple[float, float, float]) -> Tuple[float, float, float]:
-    return item[0] - item2[0], item[1] - item2[1], item[2] - item2[2]
+@numba.njit
+def subtract(item: np.array,
+             item2: np.array) -> np.array:
+    return np.array((item[0] - item2[0], item[1] - item2[1], item[2] - item2[2]))
 
 
-# @numba.njit()
-def length(vec: Tuple[float, float, float]):
-    return sqrt(dot_product(vec, vec))
+@numba.njit(fastmath=True)
+def length(vec: np.array):
+    return np.sqrt(dot_product(vec, vec))
 
 
-# @numba.njit()
+@numba.njit
 def dot_product(
-        vec: Tuple[float, float, float],
-        vec2: Tuple[float, float, float]) -> float:
+        vec: np.array,
+        vec2: np.array) -> float:
     """
     Скалярное произведение:Ж операция над двумя векторами,
      результатом которой является скаляр, то есть число,
@@ -124,9 +137,9 @@ def dot_product(
     """
     return vec[0] * vec2[0] + vec[1] * vec2[1] + vec[2] * vec2[2]
 
-
+@numba.njit()
 def closest_intersection(spheres: List[Sphere],
-                         position: Tuple[float, float, float],
+                         position: np.array,
                          min_point: float,
                          x: float,
                          y: float,
@@ -146,11 +159,11 @@ def closest_intersection(spheres: List[Sphere],
     return closest_sphere, closest_t
 
 
-# @numba.jit(forceobj=True)
+@numba.jit(forceobj=True, looplift=True)
 def compute_lighting(lights: List[Light],
-                     point: Tuple[float, float, float],
-                     normal: Tuple[float, float, float],
-                     view: Tuple[float, float, float],
+                     point: np.array,
+                     normal: np.array,
+                     view: np.array,
                      specular: int):
     i = 0.0
     length_n = length(normal)
@@ -184,8 +197,8 @@ def compute_lighting(lights: List[Light],
     return i
 
 
-# @numba.jit(forceobj=True)
-def intersect_ray_sphere(position: Tuple[float, float, float],
+@numba.njit()
+def intersect_ray_sphere(position: np.array,
                          x: float,
                          y: float,
                          z: float,
@@ -193,19 +206,19 @@ def intersect_ray_sphere(position: Tuple[float, float, float],
     float, float]:
     oc = subtract(position, sphere.center)
 
-    k1 = dot_product((x, y, z), (x, y, z))
-    k2 = 2 * dot_product(oc, (x, y, z))
+    k1 = dot_product(np.array((x, y, z)), np.array((x, y, z)))
+    k2 = 2 * dot_product(oc, np.array((x, y, z)))
     k3 = dot_product(oc, oc) - sphere.radius * sphere.radius
     discriminant = k2 * k2 - 4 * k1 * k3
     if discriminant < 0:
         return sys.maxsize, sys.maxsize
 
-    t1 = (-k2 + sqrt(discriminant)) / (2 * k1)
-    t2 = (-k2 - sqrt(discriminant)) / (2 * k1)
+    t1 = (-k2 + np.sqrt(discriminant)) / (2 * k1)
+    t2 = (-k2 - np.sqrt(discriminant)) / (2 * k1)
     return t1, t2
 
 
-# @numba.jit(forceobj=True)
+@numba.jit(forceobj=True, looplift=True)
 def trace_ray(
         spheres: List[Sphere],
         lights: List[Light],
@@ -221,10 +234,10 @@ def trace_ray(
 
     # return closest_sphere.color
 
-    point = add(CAMERA_POSITION, multiply_sw(closest_t, (x, y, z)))
+    point = add(CAMERA_POSITION, multiply_sw(closest_t, np.array((x, y, z))))
     normal = subtract(point, closest_sphere.center)
     normal = multiply_sw(1.0 / length(normal), normal)
-    view = multiply_sw(-1, (x, y, z))
+    view = multiply_sw(-1, np.array((x, y, z)))
     ligth = compute_lighting(lights, point, normal, view,
                              closest_sphere.specular)
     r, g, b = multiply_sw(ligth, closest_sphere.color)
@@ -237,12 +250,12 @@ def trace_ray(
     return int(r), int(g), int(b)
 
 
-# @numba.jit(forceobj=True)
+@numba.jit(parallel=True, forceobj=True, looplift=True)
 def set_pix(screen: pygame.Surface,
             spheres: List[Sphere],
             lights: List[Light]):
-    for x in range(int(WIDTH / 2 * -1), int(WIDTH / 2 * 1)):
-        for y in range(int(HEIGHT / 2 * -1), int(HEIGHT / 2 * 1)):
+    for x in numba.prange(int(WIDTH / 2 * -1), int(WIDTH / 2 * 1)):
+        for y in numba.prange(int(HEIGHT / 2 * -1), int(HEIGHT / 2 * 1)):
             new_x, new_y, z = canvas_to_viewport(x, y)
             r, g, b = trace_ray(spheres, lights, new_x, new_y, z)
             set_x = int(WIDTH / 2) + int(x)
@@ -254,16 +267,16 @@ if __name__ == '__main__':
     clock = pygame.time.Clock()
 
     spheres = [
-        Sphere((0, -1, 3), 1, (255, 0, 0), 500, 0.2),
-        Sphere((2, 0, 4), 1, (0, 0, 255), 500, 0.3),
-        Sphere((-2, 0, 4), 1, (0, 255, 0), 10, 0.4),
-        Sphere((0, -5001, 0), 5000, (255, 255, 0), 1000, 0.5),
+        Sphere(np.array((0.0, -1.0, 3.0)), 1, np.array((255.0, 0.0, 0.0)), 500, 0.2),
+        Sphere(np.array((2.0, 0.0, 4.0)), 1, np.array((0.0, 0.0, 255.0)), 500, 0.3),
+        Sphere(np.array((-2.0, 0.0, 4.0)), 1, np.array((0.0, 255.0, 0.0)), 10, 0.4),
+        Sphere(np.array((0.0, -5001.0, 0.0)), 5000, np.array((255.0, 255.0, 0.0)), 1000, 0.5),
     ]
 
     lights = [
-        Light(LIGHT_AMBIENT, 0.2, None),
-        Light(LIGHT_POINT, 0.6, (2, 1, 0)),
-        Light(LIGHT_DIRECTIONAL, 0.2, (1, 4, 4)),
+        Light(LIGHT_AMBIENT, 0.2, np.array((2.0, 1.0, 0.0))),
+        Light(LIGHT_POINT, 0.6, np.array((2.0, 1.0, 0.0))),
+        Light(LIGHT_DIRECTIONAL, 0.2, np.array((1.0, 4.0, 4.0))),
     ]
     while True:
         clock.tick(60)
