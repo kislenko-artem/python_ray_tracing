@@ -1,9 +1,5 @@
-
-import sys
 import time
 from dataclasses import dataclass
-from math import sqrt, pow
-from typing import Tuple, Optional, List
 
 import pygame
 
@@ -34,10 +30,9 @@ LIGHT_AMBIENT = 0
 LIGHT_POINT = 1
 LIGHT_DIRECTIONAL = 2
 
-
-
 # create the screen
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
 
 @dataclass(frozen=True)
 class Sphere:

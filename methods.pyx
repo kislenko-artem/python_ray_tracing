@@ -1,16 +1,17 @@
 from typing import Tuple, Optional, List
 import sys
 from math import sqrt, pow
+import cython
 
-WIDTH = 600
-HEIGHT = 600
+cdef int WIDTH = 600
+cdef int HEIGHT = 600
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 BACKGROUND_COLOR = WHITE
 
-VIEW_PORT_SIZE = 1
-PROJECTION_PLAN_Z = 1.0
+cdef float VIEW_PORT_SIZE = 1.0
+cdef float PROJECTION_PLAN_Z = 1.0
 CAMERA_ROTATION = [[0.7071, 0, -0.7071],
                    [0, 1, 0],
                    [0.7071, 0, 0.7071]]
@@ -24,8 +25,9 @@ LIGHT_AMBIENT = 0
 LIGHT_POINT = 1
 LIGHT_DIRECTIONAL = 2
 
-# @numba.njit()
-def canvas_to_viewport(x: int, y: int) -> Tuple[float, float, float]:
+@cython.cdivision(True)
+def canvas_to_viewport(float x, float y) -> Tuple[float, float, float]:
+    cdef float new_x, new_y
     """
     Переводим координаты из заданных в конфиге к размерам нашего холста.
     Так же переводим проекцию 2d в 3d
@@ -35,6 +37,7 @@ def canvas_to_viewport(x: int, y: int) -> Tuple[float, float, float]:
     """
     new_x = x * VIEW_PORT_SIZE / WIDTH
     new_y = y * VIEW_PORT_SIZE / WIDTH
+
     return new_x, new_y, PROJECTION_PLAN_Z
 
 
@@ -65,9 +68,7 @@ def multiply_mv(x: float, y: float, z: float) -> Tuple[float, float, float]:
 
 
 # @numba.njit()
-def add(
-        item: Tuple[float, float, float],
-        item2: Tuple[float, float, float]) -> Tuple[float, float, float]:
+def add(float[3] item, float[3] item2) -> Tuple[float, float, float]:
     return item[0] + item2[0], item[1] + item2[1], item[2] + item2[2]
 
 

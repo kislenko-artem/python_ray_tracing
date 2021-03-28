@@ -2,5 +2,5 @@ from setuptools import setup
 from Cython.Build import cythonize
 
 setup(
-    ext_modules = cythonize("methods.pyx")
+    ext_modules = cythonize("methods.pyx", annotate=True)
 )
