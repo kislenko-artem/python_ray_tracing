@@ -1,3 +1,4 @@
+
 import sys
 import time
 from dataclasses import dataclass
@@ -5,6 +6,8 @@ from math import sqrt, pow
 from typing import Tuple, Optional, List
 
 import pygame
+
+from methods import *
 
 # Intialize the pygame
 pygame.init()
@@ -32,6 +35,10 @@ LIGHT_POINT = 1
 LIGHT_DIRECTIONAL = 2
 
 
+
+# create the screen
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
 @dataclass(frozen=True)
 class Sphere:
     center: Tuple[int, int, int]
@@ -46,83 +53,6 @@ class Light:
     type: int
     intensity: float
     position: Optional[Tuple[int, int, int]]
-
-
-# create the screen
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-
-
-# @numba.njit()
-def canvas_to_viewport(x: int, y: int) -> Tuple[float, float, float]:
-    """
-    Переводим координаты из заданных в конфиге к размерам нашего холста.
-    Так же переводим проекцию 2d в 3d
-    :param x: текущая x координата холста
-    :param y: текущая y координата холста
-    :return:
-    """
-    new_x = x * VIEW_PORT_SIZE / WIDTH
-    new_y = y * VIEW_PORT_SIZE / WIDTH
-    return new_x, new_y, PROJECTION_PLAN_Z
-
-
-# @numba.njit()
-def multiply_sw(infant: float, v: Tuple[float, float, float]) -> Tuple[
-    float, float, float]:
-    return infant * v[0], infant * v[1], infant * v[2]
-
-
-# @numba.njit()
-def multiply_mv(x: float, y: float, z: float) -> Tuple[float, float, float]:
-    """
-    Вычисляем поворот камеры для каждого пикселя
-    :param x:
-    :param y:
-    :param z:
-    :return:
-    """
-    new_x = 0.0
-    new_y = 0.0
-    new_z = 0.0
-    for i in range(3):
-        new_x += x * CAMERA_ROTATION[i][0]
-        new_y += y * CAMERA_ROTATION[i][1]
-        new_z += z * CAMERA_ROTATION[i][2]
-
-    return new_x, new_y, new_z
-
-
-# @numba.njit()
-def add(
-        item: Tuple[float, float, float],
-        item2: Tuple[float, float, float]) -> Tuple[float, float, float]:
-    return item[0] + item2[0], item[1] + item2[1], item[2] + item2[2]
-
-
-# @numba.njit()
-def subtract(item: Tuple[float, float, float],
-             item2: Tuple[float, float, float]) -> Tuple[float, float, float]:
-    return item[0] - item2[0], item[1] - item2[1], item[2] - item2[2]
-
-
-# @numba.njit()
-def length(vec: Tuple[float, float, float]):
-    return sqrt(dot_product(vec, vec))
-
-
-# @numba.njit()
-def dot_product(
-        vec: Tuple[float, float, float],
-        vec2: Tuple[float, float, float]) -> float:
-    """
-    Скалярное произведение:Ж операция над двумя векторами,
-     результатом которой является скаляр, то есть число,
-     не зависящее от выбора системы координат
-    :param item: вектор
-    :param item2: вектор
-    :return:
-    """
-    return vec[0] * vec2[0] + vec[1] * vec2[1] + vec[2] * vec2[2]
 
 
 def closest_intersection(spheres: List[Sphere],
@@ -147,7 +77,8 @@ def closest_intersection(spheres: List[Sphere],
 
 
 # @numba.jit(forceobj=True)
-def compute_lighting(lights: List[Light],
+def compute_lighting(spheres: List[Sphere],
+                     lights: List[Light],
                      point: Tuple[float, float, float],
                      normal: Tuple[float, float, float],
                      view: Tuple[float, float, float],
@@ -225,7 +156,7 @@ def trace_ray(
     normal = subtract(point, closest_sphere.center)
     normal = multiply_sw(1.0 / length(normal), normal)
     view = multiply_sw(-1, (x, y, z))
-    ligth = compute_lighting(lights, point, normal, view,
+    ligth = compute_lighting(spheres, lights, point, normal, view,
                              closest_sphere.specular)
     r, g, b = multiply_sw(ligth, closest_sphere.color)
     if r > 255:
