@@ -244,7 +244,7 @@ Color = Tuple[int, int, int]
 
 
 # если включить (parallel=True, nogil=True) - работает дольше, чем без него
-@numba.njit(cache=True, parallel=True, nogil=True)
+@numba.njit(cache=True)
 def get_pix(color_arr: np.ndarray,
             coord_arr: np.ndarray,
             spheres: typed.List[Sphere],
