@@ -298,6 +298,9 @@ if __name__ == '__main__':
         coord_array = np.zeros((WIDTH * HEIGHT, 2), dtype=int)
         get_pix(color_array, coord_array, spheres, lights)
         print("compute", time.time() - s_time)
+        # TODO:
+        # 1. Перерисовывать часть экрана (только та, которая изменилась)
+        # 2. Добавить элементы управления
         for i in range(0, len(color_array)):
             screen.set_at(
                 (coord_array[i][0], coord_array[i][1]),
