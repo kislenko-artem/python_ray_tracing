@@ -299,8 +299,6 @@ if __name__ == '__main__':
         get_pix(color_array, coord_array, spheres, lights)
         print("compute", time.time() - s_time)
         for i in range(0, len(color_array)):
-            if coord_array[i][0] == 0 and coord_array[i][1] == 0:
-                continue
             screen.set_at(
                 (coord_array[i][0], coord_array[i][1]),
                 (color_array[i][0], color_array[i][1], color_array[i][2])
