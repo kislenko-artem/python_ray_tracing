@@ -1,9 +1,10 @@
 import math
 import sys
 import time
-from typing import Tuple, List, NamedTuple
+from typing import Tuple, NamedTuple
 
 import numba
+import numpy as np
 import pygame
 from numba import typed
 
@@ -242,18 +243,25 @@ Coordinates = Tuple[int, int]
 Color = Tuple[int, int, int]
 
 
+
+# если включить parallel - работает дольше, чем без него
 @numba.njit(cache=True)
-def get_pix(spheres: typed.List[Sphere],
-            lights: typed.List[Light]) -> typed.List[Tuple[Coordinates, Color]]:
-    data: List[Tuple[Coordinates, Color]] = typed.List()
+def get_pix(color_arr: np.ndarray,
+            coord_arr: np.ndarray,
+            spheres: typed.List[Sphere],
+            lights: typed.List[Light]):
+
     for x in numba.prange(int(WIDTH / 2 * -1), int(WIDTH / 2 * 1)):
+        set_x = int(WIDTH / 2) + int(x)
         for y in numba.prange(int(HEIGHT / 2 * -1), int(HEIGHT / 2 * 1)):
             new_x, new_y, z = canvas_to_viewport(x, y)
             color = trace_ray(spheres, lights, new_x, new_y, z)
-            set_x = int(WIDTH / 2) + int(x)
             set_y = int(HEIGHT / 2) - int(y) - 1
-            data.append(((set_x, set_y), color))
-    return data
+            key = set_y + (set_x * WIDTH)
+            coord_arr[key] = np.array([int(set_x), int(set_y)])
+            color_arr[key] = np.array(
+                [int(color[0]), int(color[1]), int(color[2])])
+
 
 
 if __name__ == '__main__':
@@ -286,8 +294,16 @@ if __name__ == '__main__':
                     exit()
 
         s_time = time.time()
-        data = get_pix(spheres, lights)
-        for d in data:
-            screen.set_at(d[0], d[1])
-        print(time.time() - s_time)
+        color_array = np.zeros((WIDTH * HEIGHT, 3), dtype=int)
+        coord_array = np.zeros((WIDTH * HEIGHT, 2), dtype=int)
+        get_pix(color_array, coord_array, spheres, lights)
+        print("compute", time.time() - s_time)
+        for i in range(0, len(color_array)):
+            if coord_array[i][0] == 0 and coord_array[i][1] == 0:
+                continue
+            screen.set_at(
+                (coord_array[i][0], coord_array[i][1]),
+                (color_array[i][0], color_array[i][1], color_array[i][2])
+            )
+        print("compute + draw", time.time() - s_time)
         pygame.display.update()
