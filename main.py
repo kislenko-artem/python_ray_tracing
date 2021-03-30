@@ -258,7 +258,7 @@ def get_pix(color_arr: np.ndarray,
             key = set_y + (set_x * WIDTH)
             coord_arr[key] = np.array([int(set_x), int(set_y)])
             color_arr[key] = np.array(
-                [int(color[0]), int(color[1]), int(color[2])])
+                [int(color[0]), int(color[1]), int(color[2]), 1])
 
 
 if __name__ == '__main__':
@@ -276,6 +276,8 @@ if __name__ == '__main__':
         Light(LIGHT_POINT, 0.6, (2.0, 1.0, 0.0)),
         Light(LIGHT_DIRECTIONAL, 0.2, (1.0, 4.0, 4.0))]
     )
+    color_diff = None
+    prev_color = None
     while True:
         clock.tick(60)
         screen.fill(WHITE)
@@ -291,17 +293,32 @@ if __name__ == '__main__':
                     exit()
 
         s_time = time.time()
-        color_array = np.zeros((WIDTH * HEIGHT, 3), dtype=int)
+        # три цвета и 4-е поле для проверки на пустоту
+        color_array = np.zeros((WIDTH * HEIGHT, 4), dtype=int)
         coord_array = np.zeros((WIDTH * HEIGHT, 2), dtype=int)
         get_pix(color_array, coord_array, spheres, lights)
         print("compute", time.time() - s_time)
         # TODO:
         # 1. Перерисовывать часть экрана (только та, которая изменилась)
         # 2. Добавить элементы управления
-        for i in range(0, len(color_array)):
-            screen.set_at(
-                (coord_array[i][0], coord_array[i][1]),
-                (color_array[i][0], color_array[i][1], color_array[i][2])
-            )
+        if color_diff is not None:
+            for i in range(0, len(color_diff)):
+                if not color_diff[i][3]:
+                    continue
+                screen.set_at(
+                    (coord_array[i][0], coord_array[i][1]),
+                    (color_diff[i][0], color_diff[i][1], color_diff[i][2])
+                )
+                # TODO: нужно группировать измененные области (может быть группировка заберет все выигранное время)
+                pygame.display.update(pygame.Rect(coord_array[i][0],coord_array[i][1], 1, 1))
+        else:
+            for i in range(0, len(color_array)):
+                screen.set_at(
+                    (coord_array[i][0], coord_array[i][1]),
+                    (color_array[i][0], color_array[i][1], color_array[i][2])
+                )
+            pygame.display.update()
         print("compute + draw", time.time() - s_time)
-        pygame.display.update()
+        if prev_color is not None:
+            color_diff = color_array - prev_color
+        prev_color = color_array.copy()
